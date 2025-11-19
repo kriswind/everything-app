@@ -90,6 +90,56 @@ const sanitize = <T extends object>(obj: T): T => {
     return newObj
 }
 
+
+
+export interface TimerState {
+    timeLeft: number
+    duration: number
+    isActive: boolean
+}
+
+export interface DashboardConfig {
+    widgets: string[]
+}
+
+interface AppState {
+    user: User | null
+    loading: boolean
+    todos: Todo[]
+    events: CalendarEvent[]
+    notes: Note[]
+    alarms: Alarm[]
+    profile: UserProfile
+
+    // Timer State
+    timer: TimerState
+    setTimer: (timer: Partial<TimerState>) => void
+    resetTimer: () => void
+
+    // Dashboard Config
+    dashboardConfig: DashboardConfig
+    setDashboardConfig: (config: DashboardConfig) => void
+
+    initialize: () => () => void
+
+    addTodo: (text: string) => void
+    toggleTodo: (id: string) => void
+    deleteTodo: (id: string) => void
+
+    addEvent: (event: Omit<CalendarEvent, 'id'>) => void
+    deleteEvent: (id: string) => void
+
+    addNote: (note: Omit<Note, 'id' | 'updatedAt'>) => void
+    updateNote: (id: string, content: Partial<Omit<Note, 'id' | 'updatedAt'>>) => void
+    deleteNote: (id: string) => void
+
+    addAlarm: (alarm: Omit<Alarm, 'id'>) => void
+    toggleAlarm: (id: string) => void
+    deleteAlarm: (id: string) => void
+
+    updateProfile: (profile: Partial<UserProfile>) => void
+}
+
 export const useStore = create<AppState>((set, get) => ({
     user: null,
     loading: true,
@@ -100,6 +150,39 @@ export const useStore = create<AppState>((set, get) => ({
     profile: {
         name: 'User',
         about: 'Welcome to your Everything App.'
+    },
+
+    timer: (() => {
+        try {
+            const saved = localStorage.getItem('timer')
+            return saved ? JSON.parse(saved) : { timeLeft: 0, duration: 0, isActive: false }
+        } catch {
+            return { timeLeft: 0, duration: 0, isActive: false }
+        }
+    })(),
+
+    dashboardConfig: {
+        widgets: ['greeting', 'tasks', 'events', 'alarms']
+    },
+
+    setTimer: (timerUpdate) => set((state) => {
+        const newTimer = { ...state.timer, ...timerUpdate }
+        localStorage.setItem('timer', JSON.stringify(newTimer))
+        return { timer: newTimer }
+    }),
+
+    resetTimer: () => set((state) => {
+        const newTimer = { ...state.timer, timeLeft: state.timer.duration, isActive: false }
+        localStorage.setItem('timer', JSON.stringify(newTimer))
+        return { timer: newTimer }
+    }),
+
+    setDashboardConfig: (config) => {
+        const { user } = get()
+        set({ dashboardConfig: config })
+        if (user) {
+            updateDoc(doc(db, `users/${user.uid}/profile/dashboard`), sanitize(config) as any)
+        }
     },
 
     initialize: () => {
@@ -128,6 +211,13 @@ export const useStore = create<AppState>((set, get) => ({
                     // Sanitize just in case
                     await setDoc(profileRef, sanitize(initialProfile))
                     set({ profile: initialProfile as UserProfile })
+                }
+
+                // Dashboard Config
+                const dashboardRef = doc(db, `users/${user.uid}/profile/dashboard`)
+                const dashboardSnap = await getDoc(dashboardRef)
+                if (dashboardSnap.exists()) {
+                    set({ dashboardConfig: dashboardSnap.data() as DashboardConfig })
                 }
 
                 const unsubTodos = onSnapshot(todosQuery, (snap) => {

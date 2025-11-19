@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, CheckSquare, Calendar, Book, Settings, Clock, User } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useStore } from '../store/useStore'
+import { TimerOverlay } from './TimerOverlay'
 
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -68,44 +69,61 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-auto p-4 md:p-8">
+            <main className="flex-1 overflow-auto p-4 md:p-8 pb-24 md:pb-8">
                 <div className="mx-auto max-w-5xl">
                     {children}
                 </div>
             </main>
 
+            {/* Timer Overlay */}
+            <TimerOverlay />
+
             {/* Mobile Bottom Nav */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-card px-4 py-2 flex justify-around items-center z-50">
-                {navItems.map((item) => {
-                    const isActive = location.pathname === item.path
-                    return (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            className={cn(
-                                "flex flex-col items-center gap-1 p-2 text-xs font-medium transition-colors",
-                                isActive
-                                    ? "text-primary"
-                                    : "text-muted-foreground hover:text-accent-foreground"
-                            )}
-                        >
-                            <item.icon className="h-5 w-5" />
-                            {item.label}
-                        </Link>
-                    )
-                })}
-                <Link
-                    to="/profile"
-                    className={cn(
-                        "flex flex-col items-center gap-1 p-2 text-xs font-medium transition-colors",
-                        location.pathname === '/profile'
-                            ? "text-primary"
-                            : "text-muted-foreground hover:text-accent-foreground"
-                    )}
-                >
-                    <User className="h-5 w-5" />
-                    Profile
-                </Link>
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-card z-50">
+                <div className="flex overflow-x-auto no-scrollbar py-2 px-4 gap-6 justify-between items-center min-w-full">
+                    {navItems.map((item) => {
+                        const isActive = location.pathname === item.path
+                        return (
+                            <Link
+                                key={item.path}
+                                to={item.path}
+                                className={cn(
+                                    "flex flex-col items-center gap-1 min-w-[60px] text-xs font-medium transition-colors whitespace-nowrap",
+                                    isActive
+                                        ? "text-primary"
+                                        : "text-muted-foreground hover:text-accent-foreground"
+                                )}
+                            >
+                                <item.icon className="h-5 w-5" />
+                                {item.label}
+                            </Link>
+                        )
+                    })}
+                    <Link
+                        to="/settings"
+                        className={cn(
+                            "flex flex-col items-center gap-1 min-w-[60px] text-xs font-medium transition-colors whitespace-nowrap",
+                            location.pathname === '/settings'
+                                ? "text-primary"
+                                : "text-muted-foreground hover:text-accent-foreground"
+                        )}
+                    >
+                        <Settings className="h-5 w-5" />
+                        Settings
+                    </Link>
+                    <Link
+                        to="/profile"
+                        className={cn(
+                            "flex flex-col items-center gap-1 min-w-[60px] text-xs font-medium transition-colors whitespace-nowrap",
+                            location.pathname === '/profile'
+                                ? "text-primary"
+                                : "text-muted-foreground hover:text-accent-foreground"
+                        )}
+                    >
+                        <User className="h-5 w-5" />
+                        Profile
+                    </Link>
+                </div>
             </nav>
         </div>
     )

@@ -53,8 +53,9 @@ export default function Calendar() {
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-8rem)] flex flex-col">
-            <div className="flex items-center justify-between">
+
+        <div className="space-y-6 animate-in fade-in duration-500 flex flex-col h-full lg:h-[calc(100vh-8rem)]">
+            <div className="flex items-center justify-between shrink-0">
                 <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
                 <div className="flex items-center gap-2 bg-card border rounded-lg p-1">
                     <button
@@ -75,7 +76,7 @@ export default function Calendar() {
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 lg:overflow-hidden">
                 {/* Calendar Grid */}
                 <div className="lg:col-span-2 bg-card border rounded-xl p-4 flex flex-col">
                     <div className="grid grid-cols-7 mb-2">

@@ -1,55 +1,24 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { Play, Pause, RotateCcw, Plus, Trash2, Bell, BellOff } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 export default function ClockPage() {
-    const { alarms, addAlarm, toggleAlarm, deleteAlarm } = useStore()
+    const { alarms, addAlarm, toggleAlarm, deleteAlarm, timer, setTimer, resetTimer } = useStore()
     const [activeTab, setActiveTab] = useState<'timer' | 'alarm'>('timer')
-
-    // Timer State
-    const [timeLeft, setTimeLeft] = useState(0)
-    const [isActive, setIsActive] = useState(false)
-    const [duration, setDuration] = useState(0) // Initial duration to reset to
-    const timerRef = useRef<number | null>(null)
 
     // Alarm State
     const [newAlarmTime, setNewAlarmTime] = useState('')
     const [newAlarmLabel, setNewAlarmLabel] = useState('')
-
-    // Timer Logic
-    useEffect(() => {
-        if (isActive && timeLeft > 0) {
-            timerRef.current = window.setInterval(() => {
-                setTimeLeft((prev) => prev - 1)
-            }, 1000)
-        } else if (timeLeft === 0) {
-            setIsActive(false)
-            if (timerRef.current) clearInterval(timerRef.current)
-            if (duration > 0) {
-                // Timer finished logic (could play sound here)
-                // For now just visual indication
-            }
-        }
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current)
-        }
-    }, [isActive, timeLeft, duration])
+    const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]) // Default all days
 
     const startTimer = (minutes: number) => {
         const seconds = minutes * 60
-        setDuration(seconds)
-        setTimeLeft(seconds)
-        setIsActive(true)
+        setTimer({ duration: seconds, timeLeft: seconds, isActive: true })
     }
 
     const toggleTimer = () => {
-        setIsActive(!isActive)
-    }
-
-    const resetTimer = () => {
-        setIsActive(false)
-        setTimeLeft(duration)
+        setTimer({ isActive: !timer.isActive })
     }
 
     const formatTime = (seconds: number) => {
@@ -57,6 +26,12 @@ export default function ClockPage() {
         const secs = seconds % 60
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     }
+
+    // Circular Progress Calculation
+    const radius = 120
+    const circumference = 2 * Math.PI * radius
+    const progress = timer.duration > 0 ? ((timer.duration - timer.timeLeft) / timer.duration) : 0
+    const strokeDashoffset = circumference * progress
 
     // Alarm Logic
     const handleAddAlarm = (e: React.FormEvent) => {
@@ -66,12 +41,23 @@ export default function ClockPage() {
                 time: newAlarmTime,
                 label: newAlarmLabel || 'Alarm',
                 enabled: true,
-                days: [0, 1, 2, 3, 4, 5, 6] // Default to every day for MVP
+                days: selectedDays
             })
             setNewAlarmTime('')
             setNewAlarmLabel('')
+            setSelectedDays([0, 1, 2, 3, 4, 5, 6])
         }
     }
+
+    const toggleDay = (dayIndex: number) => {
+        if (selectedDays.includes(dayIndex)) {
+            setSelectedDays(selectedDays.filter(d => d !== dayIndex))
+        } else {
+            setSelectedDays([...selectedDays, dayIndex].sort())
+        }
+    }
+
+    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-2xl mx-auto">
@@ -105,26 +91,48 @@ export default function ClockPage() {
 
             {activeTab === 'timer' ? (
                 <div className="space-y-8">
-                    {/* Timer Display */}
-                    <div className="flex flex-col items-center justify-center p-12 rounded-full border-4 border-primary/20 h-80 w-80 mx-auto relative">
-                        <span className="text-6xl font-mono font-bold tracking-wider">
-                            {formatTime(timeLeft)}
-                        </span>
-                        <div className="flex gap-4 mt-8">
-                            <button
-                                onClick={toggleTimer}
-                                disabled={timeLeft === 0 && duration === 0}
-                                className="p-4 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                            >
-                                {isActive ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-                            </button>
-                            <button
-                                onClick={resetTimer}
-                                disabled={timeLeft === 0 && duration === 0}
-                                className="p-4 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
-                            >
-                                <RotateCcw className="h-6 w-6" />
-                            </button>
+                    {/* Timer Display with Circular Progress */}
+                    <div className="relative flex items-center justify-center h-80 w-80 mx-auto">
+                        {/* Background Circle */}
+                        <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 300 300">
+                            <circle
+                                cx="150"
+                                cy="150"
+                                r={radius}
+                                className="fill-none stroke-muted stroke-[8px]"
+                            />
+                            {/* Progress Circle */}
+                            <circle
+                                cx="150"
+                                cy="150"
+                                r={radius}
+                                className="fill-none stroke-primary stroke-[8px] transition-all duration-1000 ease-linear"
+                                strokeDasharray={circumference}
+                                strokeDashoffset={strokeDashoffset}
+                                strokeLinecap="round"
+                            />
+                        </svg>
+
+                        <div className="z-10 flex flex-col items-center">
+                            <span className="text-6xl font-mono font-bold tracking-wider">
+                                {formatTime(timer.timeLeft)}
+                            </span>
+                            <div className="flex gap-4 mt-8">
+                                <button
+                                    onClick={toggleTimer}
+                                    disabled={timer.timeLeft === 0 && timer.duration === 0}
+                                    className="p-4 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                                >
+                                    {timer.isActive ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+                                </button>
+                                <button
+                                    onClick={resetTimer}
+                                    disabled={timer.timeLeft === 0 && timer.duration === 0}
+                                    className="p-4 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 transition-colors"
+                                >
+                                    <RotateCcw className="h-6 w-6" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -145,33 +153,56 @@ export default function ClockPage() {
             ) : (
                 <div className="space-y-6">
                     {/* Add Alarm */}
-                    <form onSubmit={handleAddAlarm} className="bg-card border rounded-xl p-4 flex gap-4 items-end">
-                        <div className="flex-1 space-y-2">
-                            <label className="text-sm font-medium">Time</label>
-                            <input
-                                type="time"
-                                value={newAlarmTime}
-                                onChange={(e) => setNewAlarmTime(e.target.value)}
-                                className="w-full h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                required
-                            />
+                    <form onSubmit={handleAddAlarm} className="bg-card border rounded-xl p-4 space-y-4">
+                        <div className="flex gap-4 items-end">
+                            <div className="flex-1 space-y-2">
+                                <label className="text-sm font-medium">Time</label>
+                                <input
+                                    type="time"
+                                    value={newAlarmTime}
+                                    onChange={(e) => setNewAlarmTime(e.target.value)}
+                                    className="w-full h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    required
+                                />
+                            </div>
+                            <div className="flex-[2] space-y-2">
+                                <label className="text-sm font-medium">Label</label>
+                                <input
+                                    type="text"
+                                    value={newAlarmLabel}
+                                    onChange={(e) => setNewAlarmLabel(e.target.value)}
+                                    placeholder="Alarm name"
+                                    className="w-full h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="h-10 px-4 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                            >
+                                <Plus className="h-5 w-5" />
+                            </button>
                         </div>
-                        <div className="flex-[2] space-y-2">
-                            <label className="text-sm font-medium">Label</label>
-                            <input
-                                type="text"
-                                value={newAlarmLabel}
-                                onChange={(e) => setNewAlarmLabel(e.target.value)}
-                                placeholder="Alarm name"
-                                className="w-full h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            />
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Repeat</label>
+                            <div className="flex justify-between gap-1">
+                                {days.map((day, index) => (
+                                    <button
+                                        key={index}
+                                        type="button"
+                                        onClick={() => toggleDay(index)}
+                                        className={cn(
+                                            "h-8 w-8 rounded-full text-xs font-medium transition-colors",
+                                            selectedDays.includes(index)
+                                                ? "bg-primary text-primary-foreground"
+                                                : "bg-muted text-muted-foreground hover:bg-accent"
+                                        )}
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <button
-                            type="submit"
-                            className="h-10 px-4 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                            <Plus className="h-5 w-5" />
-                        </button>
                     </form>
 
                     {/* Alarm List */}
@@ -203,7 +234,15 @@ export default function ClockPage() {
                                         </button>
                                         <div>
                                             <div className="text-2xl font-bold font-mono">{alarm.time}</div>
-                                            <div className="text-sm text-muted-foreground">{alarm.label}</div>
+                                            <div className="flex gap-2 items-center">
+                                                <span className="text-sm text-muted-foreground">{alarm.label}</span>
+                                                <span className="text-xs text-muted-foreground/60">•</span>
+                                                <span className="text-xs text-muted-foreground/60">
+                                                    {alarm.days.length === 7 ? 'Every day' :
+                                                        alarm.days.length === 0 ? 'Once' :
+                                                            alarm.days.map(d => days[d]).join(' ')}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                     <button
