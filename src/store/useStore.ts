@@ -1,5 +1,18 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { auth, db } from '../lib/firebase'
+import {
+    collection,
+    addDoc,
+    deleteDoc,
+    updateDoc,
+    doc,
+    onSnapshot,
+    query,
+    orderBy,
+    setDoc,
+    getDoc
+} from 'firebase/firestore'
+import { onAuthStateChanged, type User } from 'firebase/auth'
 
 export interface Todo {
     id: string
@@ -11,8 +24,8 @@ export interface Todo {
 export interface CalendarEvent {
     id: string
     title: string
-    date: string // ISO date string YYYY-MM-DD
-    time?: string // HH:mm
+    date: string
+    time?: string
     description?: string
 }
 
@@ -25,10 +38,10 @@ export interface Note {
 
 export interface Alarm {
     id: string
-    time: string // HH:mm
+    time: string
     label: string
     enabled: boolean
-    days: number[] // 0-6, where 0 is Sunday
+    days: number[]
 }
 
 export interface UserProfile {
@@ -38,11 +51,15 @@ export interface UserProfile {
 }
 
 interface AppState {
+    user: User | null
+    loading: boolean
     todos: Todo[]
     events: CalendarEvent[]
     notes: Note[]
     alarms: Alarm[]
     profile: UserProfile
+
+    initialize: () => () => void
 
     addTodo: (text: string) => void
     toggleTodo: (id: string) => void
@@ -62,73 +79,177 @@ interface AppState {
     updateProfile: (profile: Partial<UserProfile>) => void
 }
 
-export const useStore = create<AppState>()(
-    persist(
-        (set) => ({
-            todos: [],
-            events: [],
-            notes: [],
-            alarms: [],
-            profile: {
-                name: 'User',
-                about: 'Welcome to your Everything App.'
-            },
-
-            addTodo: (text) => set((state) => ({
-                todos: [
-                    ...state.todos,
-                    { id: crypto.randomUUID(), text, completed: false, createdAt: Date.now() }
-                ]
-            })),
-            toggleTodo: (id) => set((state) => ({
-                todos: state.todos.map((t) =>
-                    t.id === id ? { ...t, completed: !t.completed } : t
-                )
-            })),
-            deleteTodo: (id) => set((state) => ({
-                todos: state.todos.filter((t) => t.id !== id)
-            })),
-
-            addEvent: (event) => set((state) => ({
-                events: [...state.events, { ...event, id: crypto.randomUUID() }]
-            })),
-            deleteEvent: (id) => set((state) => ({
-                events: state.events.filter((e) => e.id !== id)
-            })),
-
-            addNote: (note) => set((state) => ({
-                notes: [
-                    ...state.notes,
-                    { ...note, id: crypto.randomUUID(), updatedAt: Date.now() }
-                ]
-            })),
-            updateNote: (id, content) => set((state) => ({
-                notes: state.notes.map((n) =>
-                    n.id === id ? { ...n, ...content, updatedAt: Date.now() } : n
-                )
-            })),
-            deleteNote: (id) => set((state) => ({
-                notes: state.notes.filter((n) => n.id !== id)
-            })),
-
-            addAlarm: (alarm) => set((state) => ({
-                alarms: [...state.alarms, { ...alarm, id: crypto.randomUUID() }]
-            })),
-            toggleAlarm: (id) => set((state) => ({
-                alarms: state.alarms.map((a) =>
-                    a.id === id ? { ...a, enabled: !a.enabled } : a
-                )
-            })),
-            deleteAlarm: (id) => set((state) => ({
-                alarms: state.alarms.filter((a) => a.id !== id)
-            })),
-
-            updateProfile: (profile) => set((state) => ({
-                profile: { ...state.profile, ...profile }
-            })),
-        }),
-        {
-            name: 'everything-app-storage',
+// Helper to remove undefined values which Firestore doesn't like
+const sanitize = <T extends object>(obj: T): T => {
+    const newObj = { ...obj }
+    Object.keys(newObj).forEach(key => {
+        if ((newObj as any)[key] === undefined) {
+            delete (newObj as any)[key]
         }
-    )
-)
+    })
+    return newObj
+}
+
+export const useStore = create<AppState>((set, get) => ({
+    user: null,
+    loading: true,
+    todos: [],
+    events: [],
+    notes: [],
+    alarms: [],
+    profile: {
+        name: 'User',
+        about: 'Welcome to your Everything App.'
+    },
+
+    initialize: () => {
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+            set({ user, loading: false })
+
+            if (user) {
+                // Subscribe to collections
+                const todosQuery = query(collection(db, `users/${user.uid}/todos`), orderBy('createdAt', 'desc'))
+                const eventsQuery = query(collection(db, `users/${user.uid}/events`))
+                const notesQuery = query(collection(db, `users/${user.uid}/notes`), orderBy('updatedAt', 'desc'))
+                const alarmsQuery = query(collection(db, `users/${user.uid}/alarms`))
+
+                // Profile
+                const profileRef = doc(db, `users/${user.uid}/profile/main`)
+                const profileSnap = await getDoc(profileRef)
+                if (profileSnap.exists()) {
+                    set({ profile: profileSnap.data() as UserProfile })
+                } else {
+                    // Initialize profile if not exists
+                    const initialProfile = {
+                        name: user.displayName || 'User',
+                        photoUrl: user.photoURL || null, // Use null instead of undefined
+                        about: 'Welcome to your Everything App.'
+                    }
+                    // Sanitize just in case
+                    await setDoc(profileRef, sanitize(initialProfile))
+                    set({ profile: initialProfile as UserProfile })
+                }
+
+                const unsubTodos = onSnapshot(todosQuery, (snap) => {
+                    set({ todos: snap.docs.map(d => ({ ...d.data(), id: d.id } as Todo)) })
+                })
+
+                const unsubEvents = onSnapshot(eventsQuery, (snap) => {
+                    set({ events: snap.docs.map(d => ({ ...d.data(), id: d.id } as CalendarEvent)) })
+                })
+
+                const unsubNotes = onSnapshot(notesQuery, (snap) => {
+                    set({ notes: snap.docs.map(d => ({ ...d.data(), id: d.id } as Note)) })
+                })
+
+                const unsubAlarms = onSnapshot(alarmsQuery, (snap) => {
+                    set({ alarms: snap.docs.map(d => ({ ...d.data(), id: d.id } as Alarm)) })
+                })
+
+                return () => {
+                    unsubTodos()
+                    unsubEvents()
+                    unsubNotes()
+                    unsubAlarms()
+                }
+            } else {
+                set({ todos: [], events: [], notes: [], alarms: [] })
+            }
+        })
+
+        return unsubscribeAuth
+    },
+
+    addTodo: async (text) => {
+        const { user } = get()
+        if (!user) return
+        await addDoc(collection(db, `users/${user.uid}/todos`), sanitize({
+            text,
+            completed: false,
+            createdAt: Date.now()
+        }))
+    },
+
+    toggleTodo: async (id) => {
+        const { user, todos } = get()
+        if (!user) return
+        const todo = todos.find(t => t.id === id)
+        if (todo) {
+            await updateDoc(doc(db, `users/${user.uid}/todos/${id}`), {
+                completed: !todo.completed
+            })
+        }
+    },
+
+    deleteTodo: async (id) => {
+        const { user } = get()
+        if (!user) return
+        await deleteDoc(doc(db, `users/${user.uid}/todos/${id}`))
+    },
+
+    addEvent: async (event) => {
+        const { user } = get()
+        if (!user) return
+        await addDoc(collection(db, `users/${user.uid}/events`), sanitize(event))
+    },
+
+    deleteEvent: async (id) => {
+        const { user } = get()
+        if (!user) return
+        await deleteDoc(doc(db, `users/${user.uid}/events/${id}`))
+    },
+
+    addNote: async (note) => {
+        const { user } = get()
+        if (!user) return
+        await addDoc(collection(db, `users/${user.uid}/notes`), sanitize({
+            ...note,
+            updatedAt: Date.now()
+        }))
+    },
+
+    updateNote: async (id, content) => {
+        const { user } = get()
+        if (!user) return
+        await updateDoc(doc(db, `users/${user.uid}/notes/${id}`), sanitize({
+            ...content,
+            updatedAt: Date.now()
+        }))
+    },
+
+    deleteNote: async (id) => {
+        const { user } = get()
+        if (!user) return
+        await deleteDoc(doc(db, `users/${user.uid}/notes/${id}`))
+    },
+
+    addAlarm: async (alarm) => {
+        const { user } = get()
+        if (!user) return
+        await addDoc(collection(db, `users/${user.uid}/alarms`), sanitize(alarm))
+    },
+
+    toggleAlarm: async (id) => {
+        const { user, alarms } = get()
+        if (!user) return
+        const alarm = alarms.find(a => a.id === id)
+        if (alarm) {
+            await updateDoc(doc(db, `users/${user.uid}/alarms/${id}`), {
+                enabled: !alarm.enabled
+            })
+        }
+    },
+
+    deleteAlarm: async (id) => {
+        const { user } = get()
+        if (!user) return
+        await deleteDoc(doc(db, `users/${user.uid}/alarms/${id}`))
+    },
+
+    updateProfile: async (profileData) => {
+        const { user } = get()
+        if (!user) return
+        await updateDoc(doc(db, `users/${user.uid}/profile/main`), sanitize(profileData))
+        set(state => ({ profile: { ...state.profile, ...profileData } }))
+    }
+}))

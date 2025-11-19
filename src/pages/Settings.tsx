@@ -1,6 +1,7 @@
 import { useStore } from '../store/useStore'
-import { Moon, Sun, Trash2, Download } from 'lucide-react'
+import { Moon, Sun, Trash2, Download, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { auth } from '../lib/firebase'
 
 export default function Settings() {
     const { todos, events, notes } = useStore()
@@ -44,6 +45,10 @@ export default function Settings() {
         URL.revokeObjectURL(url)
     }
 
+    const handleLogout = () => {
+        auth.signOut()
+    }
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-2xl">
             <header>
@@ -72,6 +77,26 @@ export default function Settings() {
                                 <Moon className="h-5 w-5" />
                             )}
                             <span className="sr-only">Toggle theme</span>
+                        </button>
+                    </div>
+                </section>
+
+                {/* Account */}
+                <section className="rounded-xl border bg-card p-6 shadow-sm">
+                    <h2 className="text-xl font-semibold mb-4">Account</h2>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-medium">Sign Out</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Log out of your account on this device
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-4 py-2 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                        >
+                            <LogOut className="h-4 w-4" />
+                            Sign Out
                         </button>
                     </div>
                 </section>
