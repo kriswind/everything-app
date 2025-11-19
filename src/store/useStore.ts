@@ -12,6 +12,7 @@ export interface CalendarEvent {
     id: string
     title: string
     date: string // ISO date string YYYY-MM-DD
+    time?: string // HH:mm
     description?: string
 }
 
@@ -22,10 +23,26 @@ export interface Note {
     updatedAt: number
 }
 
+export interface Alarm {
+    id: string
+    time: string // HH:mm
+    label: string
+    enabled: boolean
+    days: number[] // 0-6, where 0 is Sunday
+}
+
+export interface UserProfile {
+    name: string
+    photoUrl?: string
+    about?: string
+}
+
 interface AppState {
     todos: Todo[]
     events: CalendarEvent[]
     notes: Note[]
+    alarms: Alarm[]
+    profile: UserProfile
 
     addTodo: (text: string) => void
     toggleTodo: (id: string) => void
@@ -37,6 +54,12 @@ interface AppState {
     addNote: (note: Omit<Note, 'id' | 'updatedAt'>) => void
     updateNote: (id: string, content: Partial<Omit<Note, 'id' | 'updatedAt'>>) => void
     deleteNote: (id: string) => void
+
+    addAlarm: (alarm: Omit<Alarm, 'id'>) => void
+    toggleAlarm: (id: string) => void
+    deleteAlarm: (id: string) => void
+
+    updateProfile: (profile: Partial<UserProfile>) => void
 }
 
 export const useStore = create<AppState>()(
@@ -45,6 +68,11 @@ export const useStore = create<AppState>()(
             todos: [],
             events: [],
             notes: [],
+            alarms: [],
+            profile: {
+                name: 'User',
+                about: 'Welcome to your Everything App.'
+            },
 
             addTodo: (text) => set((state) => ({
                 todos: [
@@ -81,6 +109,22 @@ export const useStore = create<AppState>()(
             })),
             deleteNote: (id) => set((state) => ({
                 notes: state.notes.filter((n) => n.id !== id)
+            })),
+
+            addAlarm: (alarm) => set((state) => ({
+                alarms: [...state.alarms, { ...alarm, id: crypto.randomUUID() }]
+            })),
+            toggleAlarm: (id) => set((state) => ({
+                alarms: state.alarms.map((a) =>
+                    a.id === id ? { ...a, enabled: !a.enabled } : a
+                )
+            })),
+            deleteAlarm: (id) => set((state) => ({
+                alarms: state.alarms.filter((a) => a.id !== id)
+            })),
+
+            updateProfile: (profile) => set((state) => ({
+                profile: { ...state.profile, ...profile }
             })),
         }),
         {

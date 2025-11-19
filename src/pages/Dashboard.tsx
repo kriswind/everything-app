@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { Link } from 'react-router-dom'
 
 export default function Dashboard() {
-    const { todos, events } = useStore()
+    const { todos, events, profile } = useStore()
 
     const today = new Date()
     const todaysTasks = todos.filter(t => !t.completed)
@@ -16,7 +16,7 @@ export default function Dashboard() {
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <header>
-                <h1 className="text-3xl font-bold tracking-tight">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}</h1>
+                <h1 className="text-3xl font-bold tracking-tight">Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'} {profile.name}</h1>
                 <p className="text-muted-foreground mt-2">Here's what's happening today, {format(today, 'EEEE, MMMM do')}.</p>
             </header>
 

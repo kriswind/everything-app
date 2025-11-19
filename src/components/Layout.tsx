@@ -1,24 +1,38 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, Calendar, Book, Settings } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Book, Settings, Clock, User } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { useStore } from '../store/useStore'
 
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: CheckSquare, label: 'Todos', path: '/todos' },
     { icon: Calendar, label: 'Calendar', path: '/calendar' },
     { icon: Book, label: 'Notebook', path: '/notebook' },
+    { icon: Clock, label: 'Clock', path: '/clock' },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
     const location = useLocation()
+    const { profile } = useStore()
 
     return (
         <div className="flex h-screen bg-background text-foreground overflow-hidden">
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-64 flex-col border-r bg-card p-4">
-                <div className="mb-8 flex items-center gap-2 px-2">
-                    <div className="h-8 w-8 rounded-lg bg-primary" />
-                    <span className="text-xl font-bold">Everything</span>
+                <div className="mb-8 flex items-center gap-3 px-2">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden border-2 border-primary/20">
+                        {profile.photoUrl ? (
+                            <img src={profile.photoUrl} alt={profile.name} className="h-full w-full object-cover" />
+                        ) : (
+                            <User className="h-5 w-5 text-primary" />
+                        )}
+                    </div>
+                    <div className="flex flex-col overflow-hidden">
+                        <span className="font-bold truncate">{profile.name}</span>
+                        <Link to="/profile" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                            View Profile
+                        </Link>
+                    </div>
                 </div>
 
                 <nav className="flex-1 space-y-1">
@@ -80,6 +94,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </Link>
                     )
                 })}
+                <Link
+                    to="/profile"
+                    className={cn(
+                        "flex flex-col items-center gap-1 p-2 text-xs font-medium transition-colors",
+                        location.pathname === '/profile'
+                            ? "text-primary"
+                            : "text-muted-foreground hover:text-accent-foreground"
+                    )}
+                >
+                    <User className="h-5 w-5" />
+                    Profile
+                </Link>
             </nav>
         </div>
     )

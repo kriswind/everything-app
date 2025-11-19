@@ -13,7 +13,7 @@ import {
     subMonths,
     isToday
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Trash2, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Clock } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 export default function Calendar() {
@@ -21,6 +21,7 @@ export default function Calendar() {
     const [currentMonth, setCurrentMonth] = useState(new Date())
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [newEventTitle, setNewEventTitle] = useState('')
+    const [newEventTime, setNewEventTime] = useState('')
 
     const firstDayOfMonth = startOfMonth(currentMonth)
     const lastDayOfMonth = endOfMonth(currentMonth)
@@ -29,9 +30,14 @@ export default function Calendar() {
 
     const days = eachDayOfInterval({ start: startDate, end: endDate })
 
-    const selectedDateEvents = events.filter(event =>
-        isSameDay(new Date(event.date), selectedDate)
-    )
+    const selectedDateEvents = events
+        .filter(event => isSameDay(new Date(event.date), selectedDate))
+        .sort((a, b) => {
+            if (a.time && b.time) return a.time.localeCompare(b.time)
+            if (a.time) return -1
+            if (b.time) return 1
+            return 0
+        })
 
     const handleAddEvent = (e: React.FormEvent) => {
         e.preventDefault()
@@ -39,8 +45,10 @@ export default function Calendar() {
             addEvent({
                 title: newEventTitle.trim(),
                 date: selectedDate.toISOString(),
+                time: newEventTime || undefined
             })
             setNewEventTitle('')
+            setNewEventTime('')
         }
     }
 
@@ -134,9 +142,16 @@ export default function Calendar() {
                             </div>
                         ) : (
                             selectedDateEvents.map(event => (
-                                <div key={event.id} className="group flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted transition-colors">
+                                <div key={event.id} className="group flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted transition-colors">
                                     <div className="flex-1">
-                                        <p className="font-medium text-sm">{event.title}</p>
+                                        <div className="flex items-center gap-2">
+                                            {event.time && (
+                                                <span className="text-xs font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                    {event.time}
+                                                </span>
+                                            )}
+                                            <p className="font-medium text-sm">{event.title}</p>
+                                        </div>
                                         {event.description && (
                                             <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>
                                         )}
@@ -152,21 +167,27 @@ export default function Calendar() {
                         )}
                     </div>
 
-                    <form onSubmit={handleAddEvent} className="mt-auto pt-4 border-t">
+                    <form onSubmit={handleAddEvent} className="mt-auto pt-4 border-t space-y-2">
+                        <input
+                            type="text"
+                            value={newEventTitle}
+                            onChange={(e) => setNewEventTitle(e.target.value)}
+                            placeholder="Event title..."
+                            className="w-full h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        />
                         <div className="flex gap-2">
                             <input
-                                type="text"
-                                value={newEventTitle}
-                                onChange={(e) => setNewEventTitle(e.target.value)}
-                                placeholder="Add event..."
-                                className="flex-1 h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                type="time"
+                                value={newEventTime}
+                                onChange={(e) => setNewEventTime(e.target.value)}
+                                className="h-10 rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                             <button
                                 type="submit"
                                 disabled={!newEventTitle.trim()}
-                                className="h-10 w-10 flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                                className="flex-1 h-10 flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors font-medium"
                             >
-                                <Plus className="h-5 w-5" />
+                                Add Event
                             </button>
                         </div>
                     </form>
